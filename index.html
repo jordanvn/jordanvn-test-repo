@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CRUD To-Do App</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #f4f6f9;
+      color: #1e293b;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 3rem 1rem;
+    }
+
+    .app {
+      width: 100%;
+      max-width: 520px;
+    }
+
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin-bottom: 0.25rem;
+    }
+
+    .subtitle {
+      color: #64748b;
+      font-size: 0.9rem;
+      margin-bottom: 1.5rem;
+    }
+
+    /* Add form */
+    .add-form {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .add-form input {
+      flex: 1;
+      padding: 0.65rem 0.85rem;
+      border: 2px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      transition: border-color 0.15s;
+    }
+
+    .add-form input:focus {
+      outline: none;
+      border-color: #6366f1;
+    }
+
+    .add-form button {
+      padding: 0.65rem 1.25rem;
+      background: #6366f1;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .add-form button:hover { background: #4f46e5; }
+    .add-form button:focus-visible { outline: 2px solid #6366f1; outline-offset: 2px; }
+
+    /* To-do list */
+    .todo-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .todo-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: #fff;
+      padding: 0.65rem 0.85rem;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+
+    .todo-text {
+      flex: 1;
+      cursor: pointer;
+      padding: 0.15rem 0.25rem;
+      border-radius: 4px;
+      transition: background 0.15s;
+    }
+
+    .todo-text:hover { background: #f1f5f9; }
+    .todo-text:focus-visible { outline: 2px solid #6366f1; outline-offset: 2px; }
+
+    /* Edit mode */
+    .edit-input {
+      flex: 1;
+      padding: 0.35rem 0.55rem;
+      border: 2px solid #6366f1;
+      border-radius: 6px;
+      font-size: 0.95rem;
+    }
+
+    .edit-input:focus { outline: none; }
+
+    .btn-save {
+      padding: 0.35rem 0.85rem;
+      background: #22c55e;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .btn-save:hover { background: #16a34a; }
+    .btn-save:focus-visible { outline: 2px solid #22c55e; outline-offset: 2px; }
+
+    .btn-delete {
+      padding: 0.35rem 0.85rem;
+      background: #ef4444;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .btn-delete:hover { background: #dc2626; }
+    .btn-delete:focus-visible { outline: 2px solid #ef4444; outline-offset: 2px; }
+
+    /* Empty state */
+    .empty {
+      text-align: center;
+      color: #94a3b8;
+      margin-top: 2rem;
+      font-size: 0.95rem;
+    }
+
+    /* Screen-reader only utility */
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0,0,0,0);
+      white-space: nowrap;
+      border: 0;
+    }
+</style>
+</head>
+<body>
+  <main class="app" role="main">
+    <h1>To-Do List</h1>
+    <p class="subtitle">A simple CRUD demo using localStorage</p>
+
+    <form class="add-form" aria-label="Add a new to-do">
+      <label for="todo-input" class="sr-only">New to-do</label>
+      <input id="todo-input" type="text" placeholder="What needs to be done?" required aria-required="true" autocomplete="off">
+      <button type="submit">Add</button>
+    </form>
+
+    <ul id="todo-list" class="todo-list" aria-label="To-do items"></ul>
+
+    <p id="empty-msg" class="empty" hidden>No to-dos yet. Add one above!</p>
+  </main>
+
+  <script>
+    // ── Helpers ──────────────────────────────────────────────
+
+    const STORAGE_KEY = 'crud-todo-app';
+
+    // READ: Load all to-dos from localStorage
+    function getTodos() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+      } catch {
+        return [];
+      }
+    }
+
+    // Persist the full to-do array to localStorage
+    function saveTodos(todos) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(todos));
+    }
+
+    // ── DOM references ──────────────────────────────────────
+
+    const form     = document.querySelector('.add-form');
+    const input    = document.getElementById('todo-input');
+    const list     = document.getElementById('todo-list');
+    const emptyMsg = document.getElementById('empty-msg');
+
+    // ── Render ──────────────────────────────────────────────
+
+    function render() {
+      const todos = getTodos();
+      list.innerHTML = '';
+      emptyMsg.hidden = todos.length > 0;
+
+      todos.forEach(todo => {
+        const li = document.createElement('li');
+        li.className = 'todo-item';
+        li.dataset.id = todo.id;
+
+        // Text span (click to edit)
+        const span = document.createElement('span');
+        span.className = 'todo-text';
+        span.textContent = todo.text;
+        span.setAttribute('role', 'button');
+        span.setAttribute('tabindex', '0');
+        span.setAttribute('aria-label', 'Edit: ' + todo.text);
+        span.addEventListener('click', () => startEdit(todo.id));
+        span.addEventListener('keydown', e => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); startEdit(todo.id); }
+        });
+
+        // Delete button
+        const delBtn = document.createElement('button');
+        delBtn.className = 'btn-delete';
+        delBtn.textContent = 'Delete';
+        delBtn.setAttribute('aria-label', 'Delete: ' + todo.text);
+        delBtn.addEventListener('click', () => deleteTodo(todo.id));
+
+        li.append(span, delBtn);
+        list.appendChild(li);
+      });
+    }
+
+    // ── CREATE: Add a new to-do ─────────────────────────────
+
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+
+      const todos = getTodos();
+      todos.push({ id: Date.now().toString(), text });
+      saveTodos(todos);
+
+      input.value = '';
+      input.focus();
+      render();
+    });
+
+    // ── UPDATE: Inline edit a to-do ─────────────────────────
+
+    function startEdit(id) {
+      const todos = getTodos();
+      const todo = todos.find(t => t.id === id);
+      if (!todo) return;
+
+      const li = list.querySelector(`[data-id="${id}"]`);
+      li.innerHTML = '';
+
+      const editInput = document.createElement('input');
+      editInput.type = 'text';
+      editInput.className = 'edit-input';
+      editInput.value = todo.text;
+      editInput.setAttribute('aria-label', 'Editing to-do');
+
+      const saveBtn = document.createElement('button');
+      saveBtn.className = 'btn-save';
+      saveBtn.textContent = 'Save';
+
+      function commitEdit() {
+        const newText = editInput.value.trim();
+        if (newText) {
+          const current = getTodos();
+          const item = current.find(t => t.id === id);
+          if (item) {
+            item.text = newText;
+            saveTodos(current);
+          }
+        }
+        render();
+      }
+
+      saveBtn.addEventListener('click', commitEdit);
+      editInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') commitEdit();
+        if (e.key === 'Escape') render();
+      });
+
+      li.append(editInput, saveBtn);
+      editInput.focus();
+      editInput.select();
+    }
+
+    // ── DELETE: Remove a to-do ──────────────────────────────
+
+    function deleteTodo(id) {
+      const todos = getTodos().filter(t => t.id !== id);
+      saveTodos(todos);
+      render();
+    }
+
+    // ── Initial render (READ on page load) ──────────────────
+
+    render();
+  </script>
+</body>
+</html>
